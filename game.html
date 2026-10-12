@@ -1,0 +1,870 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#080b16">
+<title>🦠 Вирус-Паника</title>
+<style>
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{height:100%;margin:0;overflow:hidden}
+  body{
+    font-family:'Segoe UI',system-ui,-apple-system,'Helvetica Neue',sans-serif;
+    color:#eaf0ff;
+    user-select:none;-webkit-user-select:none;
+    background:
+      radial-gradient(circle at 18% 8%, #1c2f66 0%, transparent 55%),
+      radial-gradient(circle at 85% 92%, #43165c 0%, transparent 55%),
+      radial-gradient(circle at 50% 50%, #0d1428 0%, #070a14 100%);
+  }
+  body::after{
+    content:'';position:fixed;inset:-30%;pointer-events:none;z-index:1;
+    background:conic-gradient(from 0deg, transparent 0 70%, rgba(90,200,255,.05) 80%, transparent 90%);
+    animation:spin 40s linear infinite;
+  }
+  @keyframes spin{to{transform:rotate(360deg)}}
+
+  #fx{position:fixed;inset:0;pointer-events:none;z-index:120}
+
+  .wrap{
+    position:fixed;inset:0;z-index:10;
+    display:flex;flex-direction:column;gap:8px;
+    padding:calc(10px + env(safe-area-inset-top)) max(10px,env(safe-area-inset-right)) calc(10px + env(safe-area-inset-bottom)) max(10px,env(safe-area-inset-left));
+  }
+
+  /* ---------- HUD ---------- */
+  .hud{
+    display:flex;align-items:center;gap:6px;
+    padding:8px 10px;border-radius:18px;
+    background:rgba(255,255,255,.055);
+    border:1px solid rgba(255,255,255,.1);
+    box-shadow:0 10px 34px rgba(0,0,0,.4);
+    backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
+    flex:0 0 auto;
+  }
+  .stat{flex:1;min-width:0;text-align:center}
+  .stat .lbl{
+    display:block;font-size:.58rem;letter-spacing:.13em;text-transform:uppercase;
+    opacity:.5;margin-bottom:1px;white-space:nowrap;
+  }
+  .stat b{font-size:1.05rem;font-weight:800;font-variant-numeric:tabular-nums;line-height:1.1}
+  #score{color:#7dffb0}
+  #left{color:#ff8aa8}
+  #time{color:#8fe6ff}
+  #level{color:#ffd479}
+
+  .timerbar{
+    flex:0 0 auto;height:6px;border-radius:99px;overflow:hidden;
+    background:rgba(255,255,255,.08);
+    box-shadow:inset 0 1px 3px rgba(0,0,0,.5);
+  }
+  #timerfill{
+    display:block;height:100%;width:100%;border-radius:99px;
+    background:linear-gradient(90deg,#4df0b0,#5ac8ff);
+    transition:width .12s linear,background .3s;
+    box-shadow:0 0 14px rgba(90,220,255,.5);
+  }
+
+  /* ---------- Поле ---------- */
+  #field{
+    position:relative;flex:1 1 auto;min-height:0;
+    border-radius:24px;
+    background:
+      radial-gradient(circle at 28% 18%, rgba(80,150,255,.13), transparent 62%),
+      radial-gradient(circle at 74% 84%, rgba(190,80,255,.11), transparent 62%),
+      rgba(255,255,255,.032);
+    border:1px solid rgba(255,255,255,.09);
+    box-shadow:inset 0 0 70px rgba(0,0,0,.45), 0 18px 50px rgba(0,0,0,.35);
+    overflow:hidden;
+    touch-action:none; /* только на поле, не на body */
+  }
+  #field::before{
+    content:'';position:absolute;inset:0;border-radius:24px;pointer-events:none;
+    background-image:radial-gradient(rgba(255,255,255,.075) 1px,transparent 1px);
+    background-size:26px 26px;
+    mask-image:radial-gradient(circle at 50% 50%,#000 60%,transparent 100%);
+    -webkit-mask-image:radial-gradient(circle at 50% 50%,#000 60%,transparent 100%);
+  }
+
+  /* ---------- Предметы ---------- */
+  .item{
+    position:absolute;left:0;top:0;
+    width:var(--s);height:var(--s);
+    display:grid;place-items:center;border-radius:50%;
+    cursor:grab;z-index:10;touch-action:none;
+    will-change:transform;
+    transition:box-shadow .2s,border-color .2s;
+  }
+  .item .face{
+    font-size:calc(var(--s) * .56);line-height:1;pointer-events:none;
+    filter:drop-shadow(0 5px 10px rgba(0,0,0,.55));
+    animation:bob 2.6s ease-in-out infinite;
+    will-change:transform;
+  }
+  @keyframes bob{
+    0%,100%{transform:translateY(-3px) rotate(-6deg)}
+    50%{transform:translateY(3px) rotate(6deg)}
+  }
+  .item.virus{
+    background:radial-gradient(circle at 34% 28%, rgba(255,95,130,.55), rgba(150,10,55,.28));
+    border:1.5px solid rgba(255,130,170,.55);
+    box-shadow:0 0 22px rgba(255,60,110,.45), inset 0 0 20px rgba(255,120,160,.3);
+  }
+  .item.fruit{
+    background:radial-gradient(circle at 34% 28%, rgba(120,255,190,.35), rgba(15,110,85,.18));
+    border:1.5px solid rgba(140,255,205,.42);
+    box-shadow:0 0 18px rgba(80,255,190,.25), inset 0 0 18px rgba(150,255,210,.2);
+  }
+  .item.dragging{
+    cursor:grabbing;z-index:40;
+    box-shadow:0 18px 40px rgba(0,0,0,.6), 0 0 40px rgba(255,255,255,.35);
+  }
+  .item.dragging .face{animation:none}
+
+  /* ---------- Утилизатор ---------- */
+  #bin{
+    position:relative;z-index:50;
+    flex:0 0 auto;height:74px;
+    display:flex;align-items:center;justify-content:center;gap:10px;
+    border-radius:22px;
+    border:2px dashed rgba(110,255,205,.32);
+    background:linear-gradient(180deg, rgba(60,255,190,.07), rgba(60,255,190,.015));
+    color:#9dffd4;font-weight:700;font-size:.82rem;letter-spacing:.08em;
+    text-transform:uppercase;
+    transition:transform .18s cubic-bezier(.34,1.56,.64,1),box-shadow .18s,border-color .18s,background .18s;
+  }
+  #bin .ico{font-size:1.5rem;filter:drop-shadow(0 0 10px rgba(90,255,200,.6))}
+  #bin.hot{
+    border-color:#5cffc0;border-style:solid;
+    background:linear-gradient(180deg, rgba(60,255,190,.3), rgba(60,255,190,.08));
+    box-shadow:0 0 46px rgba(60,255,180,.55), inset 0 0 34px rgba(60,255,180,.22);
+    transform:scale(1.025);
+    color:#eafff7;
+  }
+  #bin.bad{
+    border-color:#ff5a7a;border-style:solid;
+    background:linear-gradient(180deg, rgba(255,70,110,.3), rgba(255,70,110,.08));
+    box-shadow:0 0 46px rgba(255,70,110,.5), inset 0 0 34px rgba(255,70,110,.2);
+    color:#ffe6ec;
+  }
+  #bin.shake{animation:shake .34s}
+  @keyframes shake{
+    0%,100%{transform:translateX(0)}
+    20%{transform:translateX(-9px)}
+    40%{transform:translateX(8px)}
+    60%{transform:translateX(-6px)}
+    80%{transform:translateX(4px)}
+  }
+
+  /* ---------- Всплывающие очки ---------- */
+  .float{
+    position:fixed;z-index:200;pointer-events:none;
+    font-weight:900;font-size:1.35rem;letter-spacing:.02em;
+    text-shadow:0 3px 14px rgba(0,0,0,.75);
+    transform:translate(-50%,-50%);
+    animation:floatUp .9s cubic-bezier(.2,.8,.3,1) forwards;
+  }
+  @keyframes floatUp{
+    0%{opacity:0;transform:translate(-50%,-50%) scale(.5)}
+    22%{opacity:1;transform:translate(-50%,-80%) scale(1.25)}
+    100%{opacity:0;transform:translate(-50%,-190%) scale(.95)}
+  }
+
+  /* ---------- Оверлей ---------- */
+  .overlay{
+    position:fixed;inset:0;z-index:300;
+    display:grid;place-items:center;padding:24px;
+    background:rgba(5,8,18,.74);
+    backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
+    opacity:0;pointer-events:none;transition:opacity .25s;
+  }
+  .overlay.show{opacity:1;pointer-events:auto}
+  .card{
+    width:min(430px,100%);text-align:center;
+    padding:30px 24px 26px;border-radius:28px;
+    background:linear-gradient(160deg, rgba(255,255,255,.11), rgba(255,255,255,.028));
+    border:1px solid rgba(255,255,255,.16);
+    box-shadow:0 40px 90px rgba(0,0,0,.65), inset 0 1px 0 rgba(255,255,255,.14);
+    transform:translateY(18px) scale(.96);transition:transform .32s cubic-bezier(.34,1.4,.64,1);
+  }
+  .overlay.show .card{transform:none}
+  .card .emoji{font-size:3rem;line-height:1;display:block;margin-bottom:10px;
+    filter:drop-shadow(0 8px 22px rgba(120,200,255,.45));animation:bob 3s ease-in-out infinite}
+  .card h1{margin:0 0 10px;font-size:1.55rem;font-weight:900;letter-spacing:-.01em}
+  .card p{margin:0 0 20px;line-height:1.55;font-size:.93rem;opacity:.82}
+  .card p b{color:#7dffb0}
+  .card .rules{
+    text-align:left;display:inline-block;margin:0 0 20px;padding:0;list-style:none;
+    font-size:.87rem;line-height:1.9;opacity:.85;
+  }
+  .card .rules li{white-space:nowrap}
+  .card button{
+    border:0;cursor:pointer;font-family:inherit;
+    padding:15px 38px;border-radius:999px;
+    font-size:1rem;font-weight:900;letter-spacing:.03em;color:#04140d;
+    background:linear-gradient(135deg,#5cffc0,#4dc9ff);
+    box-shadow:0 12px 34px rgba(80,255,190,.4);
+    transition:transform .14s,box-shadow .14s;
+    touch-action:manipulation; /* кнопка тапается нормально */
+    position:relative;z-index:5;
+  }
+  .card button:active{transform:scale(.95);box-shadow:0 6px 18px rgba(80,255,190,.4)}
+  .best{margin-top:14px;font-size:.78rem;opacity:.5;letter-spacing:.06em}
+</style>
+</head>
+<body>
+<canvas id="fx"></canvas>
+
+<div class="wrap">
+  <header class="hud">
+    <div class="stat"><span class="lbl">Очки</span><b id="score">0</b></div>
+    <div class="stat"><span class="lbl">Уровень</span><b id="level">1</b></div>
+    <div class="stat"><span class="lbl">Вирусы</span><b id="left">0</b></div>
+    <div class="stat"><span class="lbl">Время</span><b id="time">60</b></div>
+  </header>
+
+  <div class="timerbar"><i id="timerfill"></i></div>
+
+  <div id="field"></div>
+
+  <div id="bin">
+    <span class="ico">☣️</span>
+    <span>Био-утилизатор</span>
+  </div>
+</div>
+
+<div class="overlay show" id="overlay">
+  <div class="card">
+    <span class="emoji" id="ovEmoji">🦠</span>
+    <h1 id="ovTitle">Вирус-Паника</h1>
+    <p id="ovText">
+      На поле расползлись вирусы и смешались с полезными фруктами и овощами.
+    </p>
+    <ul class="rules" id="ovRules">
+      <li>🦠 Перетаскивай <b>вирусы</b> в утилизатор</li>
+      <li>🍎 Фрукты и овощи <b>не трогай</b></li>
+      <li>⚡ Собирай комбо за быстрые ходы</li>
+    </ul>
+    <button id="ovBtn" type="button">Играть</button>
+    <div class="best" id="ovBest"></div>
+  </div>
+</div>
+
+<script>
+(function(){
+'use strict';
+
+/* ============================================================
+   ГЛОБАЛЬНЫЙ ПЕРЕХВАТ ОШИБОК — чтобы видеть проблемы в консоли
+   ============================================================ */
+window.addEventListener('error', function(ev){
+  console.error('[VirusPanic] JS error:', ev.message, 'at', ev.filename + ':' + ev.lineno);
+});
+
+/* ============================================================
+   БЕЗОПАСНЫЙ STORAGE (не падает, если localStorage недоступен)
+   ============================================================ */
+var store = {
+  get: function(key, def){
+    try {
+      var v = window.localStorage.getItem(key);
+      return v === null ? def : v;
+    } catch(e){ return def; }
+  },
+  set: function(key, val){
+    try { window.localStorage.setItem(key, String(val)); } catch(e){}
+  }
+};
+
+/* ============================================================
+   ССЫЛКИ НА DOM
+   ============================================================ */
+var $ = function(id){ return document.getElementById(id); };
+var field     = $('field');
+var bin       = $('bin');
+var fx        = $('fx');
+var overlay   = $('overlay');
+var elScore   = $('score');
+var elLevel   = $('level');
+var elLeft    = $('left');
+var elTime    = $('time');
+var timerfill = $('timerfill');
+var ovEmoji   = $('ovEmoji');
+var ovTitle   = $('ovTitle');
+var ovText    = $('ovText');
+var ovRules   = $('ovRules');
+var ovBtn     = $('ovBtn');
+var ovBest    = $('ovBest');
+var ctx       = fx.getContext('2d');
+
+/* ============================================================
+   КОНСТАНТЫ
+   ============================================================ */
+var VIRUS_EMOJI = ['🦠','👾','🧫'];
+var FRUIT_EMOJI = ['🍎','🍌','🍇','🍓','🥕','🍅','🥦','🍊','🍋','🍑','🥑','🌽','🍒','🥝'];
+var BEST_KEY    = 'virusPanic.best';
+
+/* ============================================================
+   СОСТОЯНИЕ
+   ============================================================ */
+var state = {
+  level: 1,
+  score: 0,
+  combo: 0,
+  time: 60,
+  maxTime: 60,
+  running: false,
+  items: []
+};
+
+var fieldW = 0;
+var fieldH = 0;
+var drag = null;
+var ovAction = null;
+
+/* ============================================================
+   ЗВУК
+   ============================================================ */
+var ac = null;
+function initAudio(){
+  if(!ac){
+    try { ac = new (window.AudioContext || window.webkitAudioContext)(); }
+    catch(e){ return; }
+  }
+  if(ac.state === 'suspended' && ac.resume) ac.resume();
+}
+function tone(freq, dur, type, vol, slideTo){
+  if(!ac) return;
+  try {
+    var t = ac.currentTime;
+    var o = ac.createOscillator();
+    var g = ac.createGain();
+    o.type = type || 'sine';
+    o.frequency.setValueAtTime(freq, t);
+    if(slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, t + dur);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(vol || 0.15, t + 0.012);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g); g.connect(ac.destination);
+    o.start(t); o.stop(t + dur + 0.02);
+  } catch(e){}
+}
+var sfx = {
+  pick: function(){ tone(520, 0.07, 'triangle', 0.07, 700); },
+  good: function(n){
+    var base = 620 + Math.min(n, 6) * 70;
+    tone(base, 0.1, 'triangle', 0.16, base * 1.9);
+    setTimeout(function(){ tone(base * 1.5, 0.09, 'sine', 0.1, base * 2.4); }, 55);
+  },
+  bad: function(){ tone(190, 0.28, 'sawtooth', 0.11, 75); },
+  level: function(){
+    [523,659,784,1046].forEach(function(f,i){
+      setTimeout(function(){ tone(f, 0.16, 'triangle', 0.14); }, i * 85);
+    });
+  },
+  over: function(){
+    [440,370,294,196].forEach(function(f,i){
+      setTimeout(function(){ tone(f, 0.3, 'sawtooth', 0.1); }, i * 130);
+    });
+  }
+};
+
+/* ============================================================
+   ЧАСТИЦЫ
+   ============================================================ */
+var particles = [];
+function resizeCanvas(){
+  var dpr = Math.min(window.devicePixelRatio || 1, 2);
+  fx.width  = Math.floor(window.innerWidth  * dpr);
+  fx.height = Math.floor(window.innerHeight * dpr);
+  fx.style.width  = window.innerWidth  + 'px';
+  fx.style.height = window.innerHeight + 'px';
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+resizeCanvas();
+
+function spawnParticles(x, y, colors, count, power){
+  for(var i = 0; i < count; i++){
+    var a  = Math.random() * Math.PI * 2;
+    var sp = Math.random() * power + 1.2;
+    particles.push({
+      x: x, y: y,
+      vx: Math.cos(a) * sp,
+      vy: Math.sin(a) * sp - 1.6,
+      life: 1,
+      size: Math.random() * 4.5 + 1.8,
+      color: colors[(Math.random() * colors.length) | 0]
+    });
+  }
+}
+function fxLoop(){
+  ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
+  for(var i = particles.length - 1; i >= 0; i--){
+    var p = particles[i];
+    p.x += p.vx; p.y += p.vy;
+    p.vy += 0.19; p.vx *= 0.988;
+    p.life -= 0.021;
+    if(p.life <= 0){ particles.splice(i, 1); continue; }
+    ctx.globalAlpha = Math.max(p.life, 0);
+    ctx.fillStyle = p.color;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.size * p.life + 0.4, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+  requestAnimationFrame(fxLoop);
+}
+requestAnimationFrame(fxLoop);
+
+/* ============================================================
+   ВСПЛЫВАЮЩИЕ ОЧКИ
+   ============================================================ */
+function showFloat(x, y, text, color){
+  var d = document.createElement('div');
+  d.className = 'float';
+  d.textContent = text;
+  d.style.color = color;
+  d.style.left = x + 'px';
+  d.style.top  = y + 'px';
+  document.body.appendChild(d);
+  setTimeout(function(){ d.remove(); }, 950);
+}
+
+/* ============================================================
+   ИЗМЕРЕНИЕ ПОЛЯ
+   ============================================================ */
+function measure(){
+  var r = field.getBoundingClientRect();
+  fieldW = Math.max(1, r.width);
+  fieldH = Math.max(1, r.height);
+  for(var i = 0; i < state.items.length; i++){
+    var it = state.items[i];
+    it.x = Math.max(0, Math.min(it.x, fieldW - it.s));
+    it.y = Math.max(0, Math.min(it.y, fieldH - it.s));
+    updateItemEl(it);
+  }
+}
+if(window.ResizeObserver){
+  try { new ResizeObserver(measure).observe(field); } catch(e){}
+}
+
+/* ============================================================
+   ПРЕДМЕТЫ
+   ============================================================ */
+function updateItemEl(it){
+  var scale = it.dragging ? 1.14 : 1;
+  it.el.style.transform = 'translate3d(' + it.x + 'px,' + it.y + 'px,0) scale(' + scale + ')';
+}
+function randomPos(size){
+  var tries = 40;
+  for(var i = 0; i < tries; i++){
+    var x = Math.random() * Math.max(1, fieldW - size);
+    var y = Math.random() * Math.max(1, fieldH - size);
+    var ok = true;
+    for(var j = 0; j < state.items.length; j++){
+      var it = state.items[j];
+      var dx = (it.x + it.s / 2) - (x + size / 2);
+      var dy = (it.y + it.s / 2) - (y + size / 2);
+      if(Math.hypot(dx, dy) < (it.s + size) / 2 + 10){ ok = false; break; }
+    }
+    if(ok) return { x: x, y: y };
+  }
+  return {
+    x: Math.random() * Math.max(1, fieldW - size),
+    y: Math.random() * Math.max(1, fieldH - size)
+  };
+}
+function createItem(type, size, speed){
+  var emoji = type === 'virus'
+    ? VIRUS_EMOJI[(Math.random() * VIRUS_EMOJI.length) | 0]
+    : FRUIT_EMOJI[(Math.random() * FRUIT_EMOJI.length) | 0];
+
+  var el = document.createElement('div');
+  el.className = 'item ' + type;
+  el.style.setProperty('--s', size + 'px');
+  el.innerHTML = '<span class="face">' + emoji + '</span>';
+
+  var pos = randomPos(size);
+  var ang = Math.random() * Math.PI * 2;
+
+  var it = {
+    type: type,
+    s: size,
+    x: pos.x, y: pos.y,
+    vx: Math.cos(ang) * speed,
+    vy: Math.sin(ang) * speed,
+    el: el,
+    dragging: false
+  };
+
+  el.addEventListener('pointerdown', function(e){ onDown(e, it); });
+  field.appendChild(el);
+  state.items.push(it);
+  updateItemEl(it);
+
+  if(el.animate){
+    try {
+      el.animate(
+        [
+          { opacity: 0, transform: el.style.transform + ' scale(0.2)' },
+          { opacity: 1, transform: el.style.transform + ' scale(1)' }
+        ],
+        { duration: 320, easing: 'cubic-bezier(.34,1.56,.64,1)' }
+      );
+    } catch(e){}
+  }
+  return it;
+}
+function removeItem(it){
+  var i = state.items.indexOf(it);
+  if(i >= 0) state.items.splice(i, 1);
+  if(it.el && it.el.parentNode) it.el.remove();
+}
+function clearItems(){
+  for(var i = 0; i < state.items.length; i++){
+    if(state.items[i].el.parentNode) state.items[i].el.remove();
+  }
+  state.items.length = 0;
+}
+function virusesLeft(){
+  var n = 0;
+  for(var i = 0; i < state.items.length; i++){
+    if(state.items[i].type === 'virus') n++;
+  }
+  return n;
+}
+
+/* ============================================================
+   ФИЗИКА + ТАЙМЕР
+   ============================================================ */
+var lastT = performance.now();
+function tick(now){
+  var dt = Math.min((now - lastT) / 1000, 0.05);
+  lastT = now;
+
+  if(state.running){
+    for(var i = 0; i < state.items.length; i++){
+      var it = state.items[i];
+      if(it.dragging) continue;
+      it.x += it.vx * dt;
+      it.y += it.vy * dt;
+      if(it.x < 0){ it.x = 0; it.vx = Math.abs(it.vx); }
+      else if(it.x > fieldW - it.s){ it.x = fieldW - it.s; it.vx = -Math.abs(it.vx); }
+      if(it.y < 0){ it.y = 0; it.vy = Math.abs(it.vy); }
+      else if(it.y > fieldH - it.s){ it.y = fieldH - it.s; it.vy = -Math.abs(it.vy); }
+      updateItemEl(it);
+    }
+    updateTimer(dt);
+  }
+  requestAnimationFrame(tick);
+}
+requestAnimationFrame(tick);
+
+function updateTimer(dt){
+  state.time -= dt;
+  if(state.time <= 0){
+    state.time = 0;
+    renderTimer();
+    gameOver();
+    return;
+  }
+  renderTimer();
+}
+function renderTimer(){
+  elTime.textContent = Math.ceil(state.time);
+  var pct = Math.max(0, (state.time / state.maxTime) * 100);
+  timerfill.style.width = pct + '%';
+  timerfill.style.background = pct < 25
+    ? 'linear-gradient(90deg,#ff4d6d,#ffa14d)'
+    : 'linear-gradient(90deg,#4df0b0,#5ac8ff)';
+}
+
+/* ============================================================
+   HUD
+   ============================================================ */
+function updateHUD(){
+  elScore.textContent = state.score;
+  elLevel.textContent = state.level;
+  elLeft.textContent  = virusesLeft();
+}
+
+/* ============================================================
+   ПЕРЕТАСКИВАНИЕ
+   ============================================================ */
+function isOverBin(cx, cy){
+  var r = bin.getBoundingClientRect();
+  var pad = 12;
+  return cx > r.left - pad && cx < r.right + pad &&
+         cy > r.top  - pad && cy < r.bottom + pad;
+}
+function onDown(e, it){
+  if(!state.running || drag) return;
+  initAudio();
+  e.preventDefault();
+  var r = field.getBoundingClientRect();
+  drag = {
+    item: it,
+    id: e.pointerId,
+    ox: e.clientX - r.left - it.x,
+    oy: e.clientY - r.top  - it.y
+  };
+  it.dragging = true;
+  it.el.classList.add('dragging');
+  updateItemEl(it);
+  sfx.pick();
+}
+function onMove(e){
+  if(!drag || e.pointerId !== drag.id) return;
+  e.preventDefault();
+  var r  = field.getBoundingClientRect();
+  var it = drag.item;
+  it.x = e.clientX - r.left - drag.ox;
+  it.y = e.clientY - r.top  - drag.oy;
+  updateItemEl(it);
+  var over = isOverBin(e.clientX, e.clientY);
+  bin.classList.toggle('hot', over && it.type === 'virus');
+  bin.classList.toggle('bad', over && it.type === 'fruit');
+}
+function onUp(e){
+  if(!drag || e.pointerId !== drag.id) return;
+  var it   = drag.item;
+  var over = isOverBin(e.clientX, e.clientY);
+  var cx   = e.clientX;
+  var cy   = e.clientY;
+  bin.classList.remove('hot', 'bad');
+  it.dragging = false;
+  it.el.classList.remove('dragging');
+  drag = null;
+  if(over && it.type === 'virus'){
+    collectVirus(it, cx, cy);
+  } else if(over && it.type === 'fruit'){
+    penalty(it, cx, cy);
+  } else {
+    it.x = Math.max(0, Math.min(it.x, fieldW - it.s));
+    it.y = Math.max(0, Math.min(it.y, fieldH - it.s));
+    updateItemEl(it);
+  }
+}
+function cancelDrag(){
+  if(!drag) return;
+  drag.item.dragging = false;
+  drag.item.el.classList.remove('dragging');
+  updateItemEl(drag.item);
+  drag = null;
+  bin.classList.remove('hot', 'bad');
+}
+window.addEventListener('pointermove', onMove, { passive: false });
+window.addEventListener('pointerup', onUp);
+window.addEventListener('pointercancel', function(e){
+  if(drag && e.pointerId === drag.id) cancelDrag();
+});
+window.addEventListener('blur', cancelDrag);
+
+/* ============================================================
+   ИГРОВЫЕ СОБЫТИЯ
+   ============================================================ */
+function collectVirus(it, cx, cy){
+  var r  = bin.getBoundingClientRect();
+  var bx = r.left + r.width / 2;
+  var by = r.top  + r.height / 2;
+
+  state.combo++;
+  var gain = 10 + Math.min(state.combo - 1, 5) * 2;
+  state.score += gain;
+
+  spawnParticles(bx, by, ['#5cffc0','#4dc9ff','#ffffff','#a6ffdd'], 26, 9);
+  spawnParticles(cx, cy, ['#ff6b95','#ff9ec4'], 10, 5);
+  showFloat(bx, by - 20, '+' + gain, '#7dffb0');
+  if(state.combo > 1){
+    showFloat(bx, by - 58, 'КОМБО ×' + state.combo, '#ffd479');
+  }
+  sfx.good(state.combo);
+
+  removeItem(it);
+  updateHUD();
+  if(virusesLeft() === 0) levelComplete();
+}
+function penalty(it, cx, cy){
+  state.combo = 0;
+  state.score = Math.max(0, state.score - 5);
+
+  var r  = bin.getBoundingClientRect();
+  var bx = r.left + r.width / 2;
+  var by = r.top  + r.height / 2;
+
+  spawnParticles(bx, by, ['#ff4d6d','#ff9a6b','#ffffff'], 20, 7);
+  showFloat(bx, by - 24, '−5', '#ff7a95');
+  sfx.bad();
+
+  bin.classList.add('shake');
+  setTimeout(function(){ bin.classList.remove('shake'); }, 360);
+
+  it.x = Math.max(0, Math.min(it.x, fieldW - it.s));
+  it.y = Math.max(0, Math.min(it.y, fieldH - it.s));
+  updateItemEl(it);
+  updateHUD();
+}
+
+/* ============================================================
+   УРОВНИ
+   ============================================================ */
+function startLevel(){
+  clearItems();
+  bin.classList.remove('hot', 'bad');
+  measure();
+
+  state.time    = 38 + state.level * 6;
+  state.maxTime = state.time;
+  state.combo   = 0;
+  state.running = true;
+
+  var minSide = Math.min(fieldW, fieldH);
+  var size    = Math.max(46, Math.min(76, Math.round(minSide / 6.2)));
+
+  var virusCount = Math.min(3 + state.level * 2, 15);
+  var fruitCount = Math.min(2 + state.level, 9);
+  var vSpeed = Math.min(42 + state.level * 7,   118);
+  var fSpeed = Math.min(18 + state.level * 3.5, 62);
+
+  for(var i = 0; i < fruitCount; i++) createItem('fruit', size, fSpeed);
+  for(var j = 0; j < virusCount; j++) createItem('virus', size, vSpeed);
+
+  renderTimer();
+  updateHUD();
+  hideOverlay();
+}
+function levelComplete(){
+  state.running = false;
+  var bonus = Math.round(state.time) * 3;
+  state.score += bonus;
+  updateHUD();
+  sfx.level();
+
+  for(var i = 0; i < 5; i++){
+    (function(k){
+      setTimeout(function(){
+        spawnParticles(
+          Math.random() * window.innerWidth,
+          Math.random() * window.innerHeight * 0.6 + 60,
+          ['#5cffc0','#4dc9ff','#ffd479','#ff7ad9','#ffffff'],
+          26, 10
+        );
+      }, k * 140);
+    })(i);
+  }
+
+  showOverlay({
+    emoji: '🎉',
+    title: 'Уровень ' + state.level + ' пройден!',
+    text:  'Бонус за скорость: <b>+' + bonus + '</b><br>Всего очков: <b>' + state.score + '</b>',
+    rules: false,
+    btn:   'Следующий уровень →',
+    action: function(){ state.level++; startLevel(); }
+  });
+}
+function gameOver(){
+  state.running = false;
+  sfx.over();
+
+  for(var i = 0; i < state.items.length; i++){
+    var it = state.items[i];
+    it.dragging = false;
+    it.el.classList.remove('dragging');
+    updateItemEl(it);
+  }
+  cancelDrag();
+
+  var best = Math.max(state.score, parseInt(store.get(BEST_KEY, '0'), 10) || 0);
+  store.set(BEST_KEY, best);
+
+  showOverlay({
+    emoji: '⏱️',
+    title: 'Время вышло!',
+    text:  'Твой результат: <b>' + state.score + '</b> очков<br>Дошёл до <b>' + state.level + '</b> уровня',
+    rules: false,
+    btn:   'Играть заново 🔄',
+    action: function(){ resetGame(); }
+  });
+}
+function resetGame(){
+  state.level = 1;
+  state.score = 0;
+  state.combo = 0;
+  startLevel();
+}
+
+/* ============================================================
+   ОВЕРЛЕЙ
+   ============================================================ */
+function showOverlay(opts){
+  ovEmoji.textContent = opts.emoji;
+  ovTitle.textContent = opts.title;
+  ovText.innerHTML    = opts.text;
+  ovRules.style.display = opts.rules ? 'inline-block' : 'none';
+  ovBtn.textContent   = opts.btn;
+  ovAction            = opts.action;
+  ovBest.textContent  = '🏆 Рекорд: ' + store.get(BEST_KEY, '0');
+  overlay.classList.add('show');
+}
+function hideOverlay(){
+  overlay.classList.remove('show');
+}
+
+/* ============================================================
+   КНОПКА "ИГРАТЬ" — с двойной страховкой
+   ============================================================ */
+function handlePlay(){
+  initAudio();
+  if(typeof ovAction === 'function'){
+    ovAction();
+  } else {
+    // fallback: если ovAction вдруг null — просто стартуем игру
+    resetGame();
+  }
+}
+ovBtn.addEventListener('click', handlePlay);
+ovBtn.addEventListener('touchend', function(e){
+  // подстраховка для мобильных, где click иногда не приходит
+  e.preventDefault();
+  handlePlay();
+}, { passive: false });
+
+/* ============================================================
+   ГЛОБАЛЬНЫЕ ОБРАБОТЧИКИ
+   ============================================================ */
+window.addEventListener('resize', function(){
+  resizeCanvas();
+  measure();
+});
+window.addEventListener('orientationchange', function(){
+  setTimeout(function(){ resizeCanvas(); measure(); }, 250);
+});
+document.addEventListener('contextmenu', function(e){ e.preventDefault(); });
+
+/* ============================================================
+   ИНИЦИАЛИЗАЦИЯ — обёрнута в try/catch, чтобы ошибки не убивали скрипт молча
+   ============================================================ */
+try {
+  elScore.textContent = '0';
+  elLevel.textContent = '1';
+  elLeft.textContent  = '0';
+  elTime.textContent  = '60';
+  ovBest.textContent  = '🏆 Рекорд: ' + store.get(BEST_KEY, '0');
+
+  // действие по умолчанию для стартовой кнопки "Играть"
+  ovAction = function(){ resetGame(); };
+
+  requestAnimationFrame(function(){
+    measure();
+    setTimeout(measure, 120);
+  });
+
+  console.log('[VirusPanic] Инициализация OK. Кнопка "Играть" готова.');
+} catch(err){
+  console.error('[VirusPanic] Ошибка инициализации:', err);
+}
+
+})();
+</script>
+</body>
+</html>
