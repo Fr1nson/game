@@ -4,7 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <meta name="theme-color" content="#080b16">
-<title>🦠 Вирус-Паника</title>
+<meta name="author" content="Frinson (Автулев Матвей)">
+<title>🦠 Вирус-Паника — Frinson</title>
 <style>
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
   html,body{height:100%;margin:0;overflow:hidden}
@@ -76,7 +77,7 @@
     border:1px solid rgba(255,255,255,.09);
     box-shadow:inset 0 0 70px rgba(0,0,0,.45), 0 18px 50px rgba(0,0,0,.35);
     overflow:hidden;
-    touch-action:none; /* только на поле, не на body */
+    touch-action:none;
   }
   #field::before{
     content:'';position:absolute;inset:0;border-radius:24px;pointer-events:none;
@@ -84,6 +85,24 @@
     background-size:26px 26px;
     mask-image:radial-gradient(circle at 50% 50%,#000 60%,transparent 100%);
     -webkit-mask-image:radial-gradient(circle at 50% 50%,#000 60%,transparent 100%);
+  }
+
+  /* ---------- Водяной знак автора на игровом поле ---------- */
+  .signature{
+    position:absolute;
+    right:10px;bottom:8px;
+    z-index:5;pointer-events:none;
+    font-size:.62rem;
+    letter-spacing:.08em;
+    text-transform:uppercase;
+    color:rgba(255,255,255,.22);
+    font-weight:600;
+    text-shadow:0 1px 4px rgba(0,0,0,.5);
+    transition:color .3s,opacity .3s;
+  }
+  .signature b{
+    color:rgba(125,255,176,.4);
+    font-weight:800;
   }
 
   /* ---------- Предметы ---------- */
@@ -181,7 +200,7 @@
   .overlay.show{opacity:1;pointer-events:auto}
   .card{
     width:min(430px,100%);text-align:center;
-    padding:30px 24px 26px;border-radius:28px;
+    padding:30px 24px 24px;border-radius:28px;
     background:linear-gradient(160deg, rgba(255,255,255,.11), rgba(255,255,255,.028));
     border:1px solid rgba(255,255,255,.16);
     box-shadow:0 40px 90px rgba(0,0,0,.65), inset 0 1px 0 rgba(255,255,255,.14);
@@ -205,11 +224,41 @@
     background:linear-gradient(135deg,#5cffc0,#4dc9ff);
     box-shadow:0 12px 34px rgba(80,255,190,.4);
     transition:transform .14s,box-shadow .14s;
-    touch-action:manipulation; /* кнопка тапается нормально */
+    touch-action:manipulation;
     position:relative;z-index:5;
   }
   .card button:active{transform:scale(.95);box-shadow:0 6px 18px rgba(80,255,190,.4)}
   .best{margin-top:14px;font-size:.78rem;opacity:.5;letter-spacing:.06em}
+
+  /* ---------- Подпись автора в карточке ---------- */
+  .credit{
+    margin-top:18px;
+    padding-top:14px;
+    border-top:1px solid rgba(255,255,255,.08);
+    font-size:.72rem;
+    letter-spacing:.1em;
+    text-transform:uppercase;
+    color:rgba(255,255,255,.38);
+    font-weight:600;
+  }
+  .credit .heart{
+    color:#ff6b95;
+    animation:pulse 1.6s ease-in-out infinite;
+    display:inline-block;
+  }
+  @keyframes pulse{
+    0%,100%{transform:scale(1);opacity:.9}
+    50%{transform:scale(1.25);opacity:1}
+  }
+  .credit b{
+    color:rgba(125,255,176,.85);
+    font-weight:800;
+    letter-spacing:.12em;
+  }
+  .credit .nick{
+    color:rgba(90,200,255,.85);
+    font-weight:800;
+  }
 </style>
 </head>
 <body>
@@ -225,7 +274,10 @@
 
   <div class="timerbar"><i id="timerfill"></i></div>
 
-  <div id="field"></div>
+  <div id="field">
+    <!-- Водяной знак автора на игровом поле -->
+    <div class="signature">by <b>Frinson</b></div>
+  </div>
 
   <div id="bin">
     <span class="ico">☣️</span>
@@ -247,6 +299,11 @@
     </ul>
     <button id="ovBtn" type="button">Играть</button>
     <div class="best" id="ovBest"></div>
+
+    <!-- Подпись автора в карточке -->
+    <div class="credit">
+      Сделано с <span class="heart">❤</span> <b>Автулев Матвей</b> · <span class="nick">Frinson</span>
+    </div>
   </div>
 </div>
 
@@ -255,14 +312,14 @@
 'use strict';
 
 /* ============================================================
-   ГЛОБАЛЬНЫЙ ПЕРЕХВАТ ОШИБОК — чтобы видеть проблемы в консоли
+   ГЛОБАЛЬНЫЙ ПЕРЕХВАТ ОШИБОК
    ============================================================ */
 window.addEventListener('error', function(ev){
   console.error('[VirusPanic] JS error:', ev.message, 'at', ev.filename + ':' + ev.lineno);
 });
 
 /* ============================================================
-   БЕЗОПАСНЫЙ STORAGE (не падает, если localStorage недоступен)
+   БЕЗОПАСНЫЙ STORAGE
    ============================================================ */
 var store = {
   get: function(key, def){
@@ -811,20 +868,18 @@ function hideOverlay(){
 }
 
 /* ============================================================
-   КНОПКА "ИГРАТЬ" — с двойной страховкой
+   КНОПКА "ИГРАТЬ"
    ============================================================ */
 function handlePlay(){
   initAudio();
   if(typeof ovAction === 'function'){
     ovAction();
   } else {
-    // fallback: если ovAction вдруг null — просто стартуем игру
     resetGame();
   }
 }
 ovBtn.addEventListener('click', handlePlay);
 ovBtn.addEventListener('touchend', function(e){
-  // подстраховка для мобильных, где click иногда не приходит
   e.preventDefault();
   handlePlay();
 }, { passive: false });
@@ -842,7 +897,7 @@ window.addEventListener('orientationchange', function(){
 document.addEventListener('contextmenu', function(e){ e.preventDefault(); });
 
 /* ============================================================
-   ИНИЦИАЛИЗАЦИЯ — обёрнута в try/catch, чтобы ошибки не убивали скрипт молча
+   ИНИЦИАЛИЗАЦИЯ
    ============================================================ */
 try {
   elScore.textContent = '0';
@@ -851,7 +906,6 @@ try {
   elTime.textContent  = '60';
   ovBest.textContent  = '🏆 Рекорд: ' + store.get(BEST_KEY, '0');
 
-  // действие по умолчанию для стартовой кнопки "Играть"
   ovAction = function(){ resetGame(); };
 
   requestAnimationFrame(function(){
@@ -859,6 +913,9 @@ try {
     setTimeout(measure, 120);
   });
 
+  console.log('%c🦠 Вирус-Паника%c  by Frinson (Автулев Матвей)',
+              'color:#7dffb0;font-weight:bold;font-size:14px',
+              'color:#5ac8ff;font-size:12px');
   console.log('[VirusPanic] Инициализация OK. Кнопка "Играть" готова.');
 } catch(err){
   console.error('[VirusPanic] Ошибка инициализации:', err);
